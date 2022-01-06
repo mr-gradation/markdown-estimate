@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en" class="h-100">
+<head>
+  <meta charset="UTF-8">
+  <title></title>
+  <meta name="viewport" content="width=device-width">
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css">
+
+  <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/sortablejs@1.7.0/Sortable.min.js"></script>
+  <script src="//cdnjs.cloudflare.com/ajax/libs/Vue.Draggable/2.17.0/vuedraggable.min.js"></script>
+
+  <!-- <script src="js/pdfmake.min.js"></script> -->
+  <!-- <script src="js/vfs_fonts.js"></script> -->
+  <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script> -->
+  <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script> -->
+
+  <style>
+    .jumbotron{ padding: 2rem; margin: 1rem 0; }
+    .jumbotron h1{ font-size: 2rem; }
+    .table-borderless{ margin-bottom: 0; }
+    .table-borderless th, .table-borderless td{ padding: 0.25rem; vertical-align: middle; }
+    .table .handle{ width: 2em; min-width: 2em; }
+    .table .text{ width: 20em; min-width: 20em; }
+    .table .price{ width: 7em; min-width: 7em; }
+    .table .quantity{ width: 4em; min-width: 4em; }
+    .table .unit{ width: 4em; min-width: 4em; }
+    .table .total{ width: 10em; min-width: 10em; }
+    pre{  }
+  </style>
+</head>
+<body class="h-100">
+  
+  <div id="app" class="d-flex flex-column h-100">
+    <div class="container">
+      <div class="jumbotron">
+        <h1>スマホで見積作成</h1>
+        <p>スマートフォンで見積のたたき台を作成することができます。Markdown形式に出力することで、自分宛てにメールを送信したり、Backlog等のツールに貼り付けも可能です。</p>
+        <div class="dropdown float-right">
+          <a class="btn btn-secondary dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            Template
+          </a>
+          <div class="dropdown-menu" aria-labelledby="dropdownMenuLink">
+            <a class="dropdown-item" @click="setTemplate('update')">更新作業（見出しなし）</a>
+            <a class="dropdown-item" @click="setTemplate('update2')">更新作業（見出しあり）</a>
+            <a class="dropdown-item" @click="setTemplate('renewal')">リニューアル</a>
+          </div>
+        </div>
+        <p class="mb-0">
+        <!-- <button @click="submit" class="btn btn-outline-primary">PDF</button> -->
+        <button @click="saveTask" class="btn btn-outline-success">Save</button>
+        <button @click="loadTask" class="btn btn-outline-secondary">Load</button>
+        <button @click="clearTask" class="btn btn-outline-danger">Clear</button>
+        </p>
+      </div>
+      <div class="alert alert-info" v-if="alert">{{alert}}</div>
+      <div class="table-responsive mb-2">
+        <table class="table table-borderless">
+          <thead>
+            <tr>
+              <th class="handle"></th>
+              <th class="text">品目</th>
+              <th class="price">単価</th>
+              <th class="quantity">数量</th>
+              <th class="unit">単位</th>
+              <th class="total">価格</th>
+              <th class="control"></th>
+            </tr>
+          </thead>
+        </table>
+        <draggable :list="tasks" :options="{animation: 0, handle:'.handle'}">
+          <table class="table table-borderless" v-for="(task, index) in tasks" :key="task.id">
+            <tbody>
+              <tr>
+                <td class="handle"><i class="fas fa-bars"></i></td>
+                <td class="text"><input type="text" v-model="task.text" class="form-control"></td>
+                <td class="price"><input type="number" v-model="task.price" class="form-control"></td>
+                <td class="quantity"><input type="number" v-model="task.quantity" class="form-control"></td>
+                <td class="unit"><input type="text" v-model="task.unit" class="form-control"></td>
+                <td class="total"><input type="text" :value="separate(multiply(task))" disabled class="form-control"></td>
+                <td class="control"><button class="btn btn-outline-secondary" @click="removeTask(index)"><i class="far fa-trash-alt"></i></button></td>
+              </tr>
+            </tbody>
+          </table>
+        </draggable>
+        <table class="table table-borderless mb-4" style="width:auto">
+          <tbody>
+            <tr>
+              <td>小計</td>
+              <td>{{separate(subTotal)}} 円</td>
+            </tr>
+            <tr>
+              <td>消費税</td>
+              <td>{{separate(subTotalTax)}} 円</td>
+            </tr>
+            <tr>
+              <td>合計</td>
+              <td>{{separate(allTotal)}} 円</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <button @click="addTask" class="btn btn-primary">Add</button>
+      <button @click="convertMarkdown" class="btn btn-outline-secondary">MarkDown</button>
+      <!-- <button @click="convertHtml" class="btn btn-secondary">Preview</button> -->
+      <hr>
+      <div v-if="outputHtml">
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th class="text">品目</th>
+                <th class="price">単価</th>
+                <th class="quantity">数量</th>
+                <th class="unit">単位</th>
+                <th class="total">価格</th>
+              </tr>
+            </thead>
+            <tbody v-for="(task, index) in outputHtml" :key="task.id">
+              <tr>
+                <td class="text">{{task.text}}</td>
+                <td class="price">{{separate(task.price)}}</td>
+                <td class="quantity">{{task.quantity}}</td>
+                <td class="unit">{{task.unit}}</td>
+                <td class="total">{{separate(multiply(task))}}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <pre class="border" v-if="outputMarkDown" contentEditable @click="$refs.target.select()">
+品目 | 単価 | 数量 | 価格
+---- | ---- | ---- | ---- | ----<template v-for="(task, index) in outputMarkDown">
+{{task.text}}<template v-if="task.price"> | ＠￥{{separate(task.price)}} | {{task.quantity}}{{task.unit}} | ￥{{separate(multiply(task))}} |</template><template v-else> | | | |</template></template>
+ | | 小計 | ￥{{separate(subTotal)}}
+ | | 消費税 | ￥{{separate(subTotalTax)}}
+ | | 合計 | ￥{{separate(allTotal)}}
+</pre>
+    </div>
+    <footer class="mt-auto">
+      <div class="container py-3"></div>
+    </footer>
+  </div>
+
+  <script>
+    var app = new Vue({
+      el: '#app',
+      data: {
+        alert: '',
+        outputHtml: '',
+        outputMarkDown: '',
+        tasks: []
+      },
+      methods: {
+        addTask: function(){
+          this.tasks.push({id:this.tasks.length+1, text:'', quantity:1, unit:'式'});
+        },
+        removeTask: function(index){
+          this.tasks.splice(index, 1);
+        },
+        saveTask: function(){
+          alert('Coming Soon');
+        },
+        loadTask: function(){
+          alert('Coming Soon');
+        },
+        clearTask: function(){
+          if( confirm('削除してよろしいですか？') ){
+            this.tasks = [];
+          }
+        },
+        setTemplate: function(template){
+          if( this.tasks.length && !confirm('編集中の内容が削除されます。テンプレートを読み込んでよろしいですか？') ){
+            return false;
+          } else {
+            switch(template){
+              case 'update':
+                this.tasks = [
+                  {id:1, text:'会社概要 > 社長挨拶', price:0, quantity:1, unit:'頁'},
+                  {id:2, text:'会社概要 > 会社情報', price:0, quantity:1, unit:'頁'},
+                  {id:3, text:'会社概要 > 沿革', price:0, quantity:1, unit:'頁'},
+                ];
+                break;
+              case 'update2':
+                this.tasks = [
+                  {id:0, text:'【既存ページ修正（テキストのみ）】'},
+                  {id:1, text:'会社概要', price:0, quantity:1, unit:'頁'},
+                  {id:2, text:''},
+                  {id:3, text:'【既存ページ修正（画像を含む）】'},
+                  {id:4, text:'会社概要', price:0, quantity:1, unit:'頁'},
+                  {id:5, text:''},
+                  {id:6, text:'【新規ページ制作】'},
+                  {id:7, text:'会社概要', price:0, quantity:1, unit:'頁'},
+                ];
+                break;
+              case 'renewal':
+                this.tasks = [
+                  {id:0, text:'【基本制作費】'},
+                  {id:1, text:'要件定義・進行管理費', price:0, quantity:1, unit:'式'},
+                  {id:2, text:''},
+                  {id:3, text:'【デザイン設計費】'},
+                  {id:4, text:'PC用トップページデザイン（1案）', price:0, quantity:1, unit:'案'},
+                  {id:5, text:'PC用下層ページデザイン（1フォーマット）', price:0, quantity:1, unit:'式'},
+                  {id:6, text:'SP用トップページデザイン（1案）', price:0, quantity:1, unit:'案'},
+                  {id:7, text:'SP用下層ページデザイン（1フォーマット）', price:0, quantity:1, unit:'式'},
+                  {id:8, text:''},
+                  {id:9, text:'【HTML5/CSS3/JavaScript設計費】'},
+                  {id:10, text:'PC版サイト共通設計（ヘッダー、フッター、パーツ類）', price:0, quantity:1, unit:'式'},
+                  {id:11, text:'SP版サイト共通設計（ヘッダー、フッター、パーツ類）', price:0, quantity:1, unit:'式'},
+                  {id:12, text:'トップページコーディング', price:0, quantity:1, unit:'式'},
+                  {id:13, text:'下層ページコーディング（Aランク）', price:0, quantity:1, unit:'式'},
+                  {id:14, text:'下層ページコーディング（Bランク）', price:0, quantity:1, unit:'式'},
+                  {id:15, text:'下層ページコーディング（Cランク）', price:0, quantity:1, unit:'式'},
+                  {id:16, text:''},
+                  {id:17, text:'【コンテンツ管理システム（CMS）開発費】'},
+                  {id:18, text:'スタンダードライセンス（1段階承認機能なし、5ユーザまで）', price:0, quantity:1, unit:'式'},
+                  {id:19, text:'インストールおよび初期設定', price:0, quantity:1, unit:'式'},
+                  {id:20, text:'システム構築（Aランク）', price:0, quantity:1, unit:'式'},
+                  {id:21, text:'システム構築（Bランク）', price:0, quantity:1, unit:'式'},
+                  {id:22, text:'システム構築（Cランク）', price:0, quantity:1, unit:'式'},
+                  {id:23, text:''},
+                  {id:24, text:'【動作確認】'},
+                  {id:25, text:'PCブラウザ表示検証', price:0, quantity:1, unit:'人日'},
+                  {id:26, text:'SPブラウザ表示検証', price:0, quantity:1, unit:'人日'},
+                ];
+                break;
+            }
+          }
+        },
+        convertHtml: function(){
+          this.outputHtml = this.tasks;
+        },
+        convertMarkdown: function(){
+          this.outputMarkDown = this.tasks;
+        },
+        multiply: function(task){
+          if( task.price ){
+            return task.price * task.quantity;
+          }
+        },
+        total: function(){
+          var total = 0;
+          for(i in this.tasks){
+            if( this.multiply(this.tasks[i]) )
+              total += this.multiply(this.tasks[i]);
+          }
+          return total;
+        },
+        separate: function(num){
+          if( num ){
+            return String(num).replace( /(\d)(?=(\d\d\d)+(?!\d))/g, '$1,');
+          }
+        },
+      },
+      computed: {
+        subTotal: function(){
+          return this.total();
+        },
+        subTotalTax: function(num){
+          return Math.round(this.total() * 0.08);
+        },
+        allTotal: function(){
+          return Math.round(this.total() * 1.08);
+        }
+      }
+
+    });
+  </script>
+
+</body>
+</html>
+
+
+
